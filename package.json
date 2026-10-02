@@ -1,0 +1,27 @@
+{
+  "name": "annies-list",
+  "version": "1.0.0",
+  "description": "Annie’s List — one grocery budget across every store",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@fontsource-variable/nunito": "^5.3.0",
+    "@fontsource/jetbrains-mono": "^5.3.0",
+    "@supabase/supabase-js": "^2.117.2",
+    "@zxing/browser": "^0.2.1",
+    "@zxing/library": "^0.23.0",
+    "next": "^15.5.27",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "typescript": "^5.9.3"
+  },
+  "private": true
+}
