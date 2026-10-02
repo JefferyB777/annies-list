@@ -185,7 +185,8 @@ export async function runScout(q: ScoutQuery): Promise<ScoutReport> {
   }
 
   const sizeNote = product?.size ? ` (${product.size})` : "";
-  const label = `${itemName || "This item"}${sizeNote}`;
+  const nice = itemName ? itemName.charAt(0).toUpperCase() + itemName.slice(1) : "This item";
+  const label = `${nice}${sizeNote}`;
   if (!pick) {
     return finish({
       item: itemName, estimate: null, confidence: null, source: null,

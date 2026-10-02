@@ -82,25 +82,36 @@ export async function lookupProduct(barcode: string): Promise<Product | null> {
 
 /* ---------------- Typed name → typical category ---------------- */
 
-/** For items typed in by name ("can of peas"), find the Open Food Facts category most products with that name share. */
+/** "a can of peas" → "peas"; remembers packaging words so "can" can favor canned categories. */
+function cleanName(name: string) {
+  const lower = name.toLowerCase();
+  const packaging = (lower.match(/\b(can|canned|tin|frozen|bag|box|jar|bottle|carton)\b/) || [])[1] || null;
+  const terms = lower
+    .replace(/\b(a|an|the|of|some|one|1|can|cans|canned|tin|tins|bag|bags|box|boxes|jar|jars|bottle|bottles|carton|cartons|pack|package|dozen|doz|lb|lbs|oz|ct|count)\b/g, " ")
+    .replace(/[^a-z0-9 ]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return { terms: terms || lower.trim(), packaging };
+}
+
+/** For items typed in by name ("can of peas"), find the Open Food Facts category most U.S. products with that name share. */
 export async function categoryForName(name: string): Promise<string | null> {
+  const { terms, packaging } = cleanName(name);
   const q = new URLSearchParams({
-    search_terms: name,
-    search_simple: "1",
-    json: "1",
-    page_size: "8",
+    q: `${terms} countries_tags:"en:united-states"`,
+    page_size: "20",
     fields: "categories_tags",
-    tagtype_0: "countries",
-    tag_contains_0: "contains",
-    tag_0: "united-states",
   });
-  const j = await getJSON(`https://world.openfoodfacts.org/cgi/search.pl?${q}`, 7 * DAY);
-  const products: any[] = j?.products || [];
+  const j = await getJSON(`https://search.openfoodfacts.org/search?${q}`, 7 * DAY);
+  const hits: any[] = j?.hits || [];
   const counts = new Map<string, number>();
-  for (const p of products) {
+  for (const p of hits) {
     const en = (p.categories_tags || []).filter((c: string) => c.startsWith("en:"));
     const last = en[en.length - 1];
-    if (last) counts.set(last, (counts.get(last) || 0) + 1);
+    if (!last) continue;
+    let w = 1;
+    if (packaging && last.includes(packaging === "can" || packaging === "tin" ? "canned" : packaging)) w += 1;
+    counts.set(last, (counts.get(last) || 0) + w);
   }
   const best = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
   return best && best[1] >= 2 ? best[0] : null;
