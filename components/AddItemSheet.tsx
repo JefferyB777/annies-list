@@ -3,8 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import type { DataStore } from "@/lib/data";
 import type { NewItem, PriceStats } from "@/lib/types";
+import type { ScoutReport } from "@/lib/scout/types";
 import { money, priceSignal, productKeyFor, round2 } from "@/lib/money";
 import { lookupProductName } from "@/lib/product";
+import ScoutCard, { fetchScout } from "./ScoutCard";
 
 type Props = {
   store: DataStore;
@@ -12,24 +14,70 @@ type Props = {
   storeName: string;
   remaining: number;
   barcode: string | null;
+  zip: string;
+  onSetZip: () => void;
   onAdd: (item: NewItem) => Promise<void>;
   onCancel: () => void;
 };
 
 /** Cents-style entry: typing 3, 4, 9 shows $3.49 — fast and one-handed. */
 const centsToDollars = (digits: string) => (digits ? parseInt(digits, 10) / 100 : 0);
+const toCents = (n: number) => String(Math.round(n * 100));
 
-export default function AddItemSheet({ store, budgetId, storeName, remaining, barcode, onAdd, onCancel }: Props) {
+type PriceFrom = "history" | "scout" | "user" | null;
+
+export default function AddItemSheet({ store, budgetId, storeName, remaining, barcode, zip, onSetZip, onAdd, onCancel }: Props) {
   const [name, setName] = useState("");
   const [looking, setLooking] = useState(!!barcode);
   const [stats, setStats] = useState<PriceStats | null>(null);
   const [digits, setDigits] = useState("");
   const [pristine, setPristine] = useState(true); // first keystroke replaces a pre-filled price
+  const [priceFrom, setPriceFrom] = useState<PriceFrom>(null);
   const [qty, setQty] = useState(1);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
+  const [scout, setScout] = useState<ScoutReport | null>(null);
+  const [scouting, setScouting] = useState(false);
   const priceRef = useRef<HTMLInputElement>(null);
   const nameRef = useRef<HTMLInputElement>(null);
+  const digitsRef = useRef("");
+  digitsRef.current = digits;
+  const scoutedFor = useRef("");
+
+  /** Price Scout result arrived: show it, and pre-fill the price if nothing better is there yet. */
+  const applyScout = (r: ScoutReport | null) => {
+    setScout(r);
+    setScouting(false);
+    if (r?.estimate && !digitsRef.current) {
+      setDigits(toCents(r.estimate));
+      setPristine(true);
+      setPriceFrom("scout");
+    }
+  };
+
+  const runScout = async (q: { barcode?: string | null; name?: string | null }) => {
+    if (!zip) return;
+    const key = `${q.barcode || q.name}|${zip}`;
+    if (scoutedFor.current === key) return;
+    scoutedFor.current = key;
+    setScouting(true);
+    const r = await fetchScout({ ...q, zip });
+    if (scoutedFor.current === key) applyScout(r);
+  };
+
+  // Scanned barcode: ask Price Scout right away, in parallel with the name lookup.
+  useEffect(() => {
+    if (barcode) runScout({ barcode });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [barcode, zip]);
+
+  // Typed name: ask Price Scout once she pauses typing.
+  useEffect(() => {
+    if (barcode || name.trim().length < 3 || !zip) return;
+    const t = setTimeout(() => runScout({ name }), 1100);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [name, barcode, zip]);
 
   // Barcode: check her own history first, then the public product database.
   useEffect(() => {
@@ -44,7 +92,9 @@ export default function AddItemSheet({ store, budgetId, storeName, remaining, ba
       if (s) {
         setStats(s);
         setName(s.name);
-        setDigits(String(Math.round(s.last * 100)));
+        setDigits(toCents(s.last));
+        setPristine(true);
+        setPriceFrom("history");
         setLooking(false);
         setTimeout(() => priceRef.current?.focus(), 250);
         return;
@@ -70,9 +120,10 @@ export default function AddItemSheet({ store, budgetId, storeName, remaining, ba
     const t = setTimeout(async () => {
       const s = await store.priceStats(productKeyFor(null, name)).catch(() => null);
       setStats(s);
-      if (s && !digits) {
-        setDigits(String(Math.round(s.last * 100)));
+      if (s && (!digitsRef.current || priceFrom === "scout")) {
+        setDigits(toCents(s.last));
         setPristine(true);
+        setPriceFrom("history");
       }
     }, 450);
     return () => clearTimeout(t);
@@ -92,8 +143,23 @@ export default function AddItemSheet({ store, budgetId, storeName, remaining, ba
       d = d.slice(-1 * (d.length - digits.length));
     }
     setPristine(false);
+    setPriceFrom("user");
     setDigits(d.replace(/^0+/, "").slice(0, 6));
   };
+
+  const takeScoutPrice = (p: number) => {
+    setDigits(toCents(p));
+    setPristine(true);
+    setPriceFrom("scout");
+  };
+
+  const prefilledFromScout = priceFrom === "scout" && pristine;
+  const priceLabel = prefilledFromScout
+    ? "Scout estimate"
+    : priceFrom === "history" && pristine
+      ? "Last price you paid"
+      : "Shelf price";
+  const showSignal = !looking && (!!stats || (name.trim().length > 1 && !scout?.estimate && !scouting));
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -140,7 +206,7 @@ export default function AddItemSheet({ store, budgetId, storeName, remaining, ba
 
         <div className="price-row">
           <label className="field price-field">
-            <span className="field-label">Shelf price</span>
+            <span className={`field-label ${prefilledFromScout ? "label-scout" : ""}`}>{priceLabel}</span>
             <input
               ref={priceRef}
               className="input-price"
@@ -166,7 +232,7 @@ export default function AddItemSheet({ store, budgetId, storeName, remaining, ba
           </div>
         </div>
 
-        {(name.trim().length > 1 || stats) && !looking && (
+        {showSignal && (
           <div className={`signal signal-${signal.tone}`} role="status">
             <span className="signal-dot" aria-hidden />
             <div>
@@ -174,6 +240,18 @@ export default function AddItemSheet({ store, budgetId, storeName, remaining, ba
               {signal.detail && <p>{signal.detail}</p>}
             </div>
           </div>
+        )}
+
+        {(barcode || name.trim().length >= 3) && (
+          <ScoutCard
+            report={scout}
+            loading={scouting}
+            zip={zip}
+            shelfPrice={prefilledFromScout ? 0 : price}
+            applied={prefilledFromScout}
+            onUse={takeScoutPrice}
+            onSetZip={onSetZip}
+          />
         )}
 
         {err && <p className="error">{err}</p>}

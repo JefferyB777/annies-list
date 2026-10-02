@@ -35,3 +35,20 @@ Camera scanning needs HTTPS (works on the Vercel URL, or localhost).
 - Email login, linking the anonymous account
 - Shared community price pool (store + product + price + date, no personal details)
 - Guardrails against bad entries (outlier filtering, minimum reports before showing a community average)
+
+## Price Scout (local price agent)
+
+`GET /api/scout?barcode=<upc>&zip=<zip>` or `GET /api/scout?name=<item>&zip=<zip>` returns a report:
+item, estimated typical price, range, confidence, source (name, detail, link), a one-paragraph summary,
+and every source checked. The add-item screen shows it as the **Price Scout** card, pre-fills the price,
+and compares the shelf tag to the local typical.
+
+Sources, most to least specific (stops at the first trustworthy answer):
+1. Open Prices (Open Food Facts) — this barcode, within ~25 miles of the ZIP
+2. Open Prices — this barcode, anywhere in the U.S.
+3. Open Prices — similar items (same category) nearby
+4. U.S. Bureau of Labor Statistics average retail prices for the region (staples only, scaled to package size)
+5. Claude web research of local store listings — **optional**, runs only when `ANTHROPIC_API_KEY` is set in Vercel
+6. Open Prices — similar items anywhere in the U.S. (rough guide)
+
+ZIP codes are looked up with zippopotam.us. Responses are cached (6 hours at the edge, 1–7 days per source).

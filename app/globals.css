@@ -199,6 +199,48 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .signal-even { background: #efebe2; color: var(--ink); }
 .signal-new { background: var(--accent-soft); color: #8a2b10; }
 .error { color: var(--over); font-weight: 800; margin: 0 0 10px; }
+.label-scout { color: var(--scout); }
+.zip-field { margin-top: 22px; }
+
+/* ---------- Price Scout ---------- */
+:root { --scout: #1f5c8f; --scout-soft: #e6f0f8; --scout-line: #bcd4e8; }
+.scout {
+  background: var(--card); border: 2px solid var(--scout-line); border-radius: 18px;
+  padding: 12px 14px; margin-bottom: 14px; font-size: 15px;
+}
+.scout p { margin: 6px 0 0; }
+.scout-head { display: flex; align-items: center; gap: 8px; }
+.scout-badge { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; background: var(--scout); color: #fff; }
+.scout-title { font-size: 12px; letter-spacing: 0.14em; font-weight: 700; color: var(--scout); }
+.scout-area { margin-left: auto; font-size: 13px; font-weight: 700; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.scout-main { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; margin-top: 8px; }
+.scout-price { font-size: 34px; font-weight: 900; line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.scout-sub { font-size: 14px; font-weight: 700; color: var(--ink-2); margin-top: 4px; }
+.scout-conf { font-size: 12px; font-weight: 800; padding: 5px 10px; border-radius: 99px; white-space: nowrap; }
+.conf-high { background: var(--good-soft); color: var(--good); }
+.conf-medium { background: var(--scout-soft); color: var(--scout); }
+.conf-low { background: #efebe2; color: var(--ink-2); }
+.scout-compare { font-weight: 800; }
+.cmp-good { color: var(--good); }
+.cmp-high { color: var(--high); }
+.cmp-even { color: var(--ink); }
+.scout-source { color: var(--ink-2); font-weight: 600; font-size: 13px; }
+.scout-source a { color: var(--scout); font-weight: 800; }
+.scout-actions { display: flex; align-items: center; gap: 12px; margin-top: 10px; }
+.scout-btn { height: 42px; padding: 0 16px; border-radius: 12px; background: var(--scout); color: #fff; font-weight: 800; font-size: 15px; }
+.scout-link { height: 42px; font-weight: 800; color: var(--scout); font-size: 15px; text-decoration: underline; text-underline-offset: 3px; }
+.scout-report { margin-top: 10px; padding-top: 10px; border-top: 1.5px dashed var(--scout-line); font-size: 14px; }
+.scout-report ol { margin: 8px 0 0; padding-left: 20px; color: var(--ink-2); }
+.scout-report li { margin: 3px 0; }
+.scout-report li.hit { color: var(--ink); }
+.scout-empty p, .scout-none p { color: var(--ink-2); font-weight: 600; }
+.scout-empty .scout-btn { margin-top: 10px; }
+.scout-working { display: flex; align-items: center; gap: 10px; font-weight: 700; color: var(--ink-2); }
+.scout-dots { display: inline-flex; gap: 4px; }
+.scout-dots i { width: 7px; height: 7px; border-radius: 99px; background: var(--scout); animation: blink 1s infinite ease-in-out; }
+.scout-dots i:nth-child(2) { animation-delay: 0.15s; }
+.scout-dots i:nth-child(3) { animation-delay: 0.3s; }
+@keyframes blink { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
 
 .menu-row { width: 100%; display: flex; justify-content: space-between; align-items: center; min-height: 60px; padding: 0 4px; border-bottom: 1.5px solid var(--line); font-weight: 800; text-align: left; }
 .fine { font-size: 14px; color: var(--ink-2); margin: 14px 4px 6px; }

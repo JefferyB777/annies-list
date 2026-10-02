@@ -10,7 +10,7 @@ import AddItemSheet from "./AddItemSheet";
 const DEFAULT_STORES = ["Sam's Club", "BJ's", "Stop & Shop", "King Kullen", "ShopRite", "CVS"];
 const PREF_KEY = "annies-list:prefs";
 
-type Prefs = { stores: string[]; current: string };
+type Prefs = { stores: string[]; current: string; zip?: string };
 
 function loadPrefs(): Prefs {
   try {
@@ -20,7 +20,7 @@ function loadPrefs(): Prefs {
       if (Array.isArray(p.stores) && p.stores.length) return p;
     }
   } catch {}
-  return { stores: DEFAULT_STORES, current: DEFAULT_STORES[0] };
+  return { stores: DEFAULT_STORES, current: DEFAULT_STORES[0], zip: "" };
 }
 function savePrefs(p: Prefs) {
   try {
@@ -91,13 +91,26 @@ export default function App() {
     const name = window.prompt("Store name")?.trim();
     if (!name) return;
     const stores = prefs.stores.includes(name) ? prefs.stores : [...prefs.stores, name];
-    const p = { stores, current: name };
+    const p = { ...prefs, stores, current: name };
     setPrefs(p);
     savePrefs(p);
   };
 
-  const startBudget = async (total: number, name = "Groceries") => {
+  const saveZip = (zip: string) => {
+    const p = { ...prefs, zip };
+    setPrefs(p);
+    savePrefs(p);
+  };
+  const askZip = () => {
+    const v = window.prompt("Your ZIP code (for local prices)", prefs.zip || "")?.trim();
+    if (v === undefined) return;
+    if (v === "" || /^\d{5}$/.test(v)) saveZip(v);
+    else setToast("ZIP codes are 5 digits");
+  };
+
+  const startBudget = async (total: number, name = "Groceries", zip?: string) => {
     if (!store) return;
+    if (zip !== undefined && /^\d{5}$/.test(zip)) saveZip(zip);
     const b = await store.createBudget(name, total);
     setBudget(b);
     setItems([]);
@@ -154,7 +167,7 @@ export default function App() {
     );
   }
 
-  if (!budget) return <BudgetSetup notice={notice} onStart={startBudget} />;
+  if (!budget) return <BudgetSetup notice={notice} initialZip={prefs.zip || ""} onStart={(n, zip) => startBudget(n, "Groceries", zip)} />;
 
   return (
     <main className="shell">
@@ -279,6 +292,8 @@ export default function App() {
           storeName={prefs.current}
           remaining={remaining}
           barcode={flow.barcode}
+          zip={prefs.zip || ""}
+          onSetZip={askZip}
           onAdd={handleAdd}
           onCancel={() => setFlow({ kind: "none" })}
         />
@@ -298,6 +313,10 @@ export default function App() {
               <span>Start a new budget</span>
               <span className="muted">clears the cart</span>
             </button>
+            <button className="menu-row" onClick={askZip}>
+              <span>Price Scout ZIP code</span>
+              <span className="mono muted">{prefs.zip || "not set"}</span>
+            </button>
             <p className="fine">
               {store?.mode === "cloud"
                 ? "Saved to the cloud. Your price history carries over to every new budget."
@@ -313,8 +332,17 @@ export default function App() {
   );
 }
 
-function BudgetSetup({ onStart, notice }: { onStart: (n: number) => Promise<void>; notice: string }) {
+function BudgetSetup({
+  onStart,
+  notice,
+  initialZip,
+}: {
+  onStart: (n: number, zip: string) => Promise<void>;
+  notice: string;
+  initialZip: string;
+}) {
   const [digits, setDigits] = useState("50000");
+  const [zip, setZip] = useState(initialZip);
   const [busy, setBusy] = useState(false);
   const amount = digits ? parseInt(digits, 10) / 100 : 0;
   return (
@@ -349,6 +377,17 @@ function BudgetSetup({ onStart, notice }: { onStart: (n: number) => Promise<void
             </button>
           ))}
         </div>
+        <label className="field zip-field">
+          <span className="field-label">ZIP code · for Price Scout&apos;s local prices</span>
+          <input
+            className="input-lg"
+            inputMode="numeric"
+            autoComplete="postal-code"
+            placeholder="e.g. 11510"
+            value={zip}
+            onChange={(e) => setZip(e.target.value.replace(/\D/g, "").slice(0, 5))}
+          />
+        </label>
       </div>
       <div className="actionbar">
         <button
@@ -357,7 +396,7 @@ function BudgetSetup({ onStart, notice }: { onStart: (n: number) => Promise<void
           onClick={async () => {
             setBusy(true);
             try {
-              await onStart(round2(amount));
+              await onStart(round2(amount), zip);
             } finally {
               setBusy(false);
             }
