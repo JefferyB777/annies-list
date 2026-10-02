@@ -24,6 +24,8 @@ export type ScoutReport = {
   source: { name: string; detail: string; url?: string } | null;
   /** e.g. "Baldwin, NY" */
   area: string | null;
+  /** what area the winning number describes: the shopper's area, a region, or "U.S." */
+  scope?: string;
   /** one-paragraph plain summary for the app */
   summary: string;
   /** every source the agent checked, in order */

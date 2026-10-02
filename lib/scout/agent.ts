@@ -91,7 +91,7 @@ export async function runScout(q: ScoutQuery): Promise<ScoutReport> {
 
   const category = bestCategory(product) || (!product && q.name ? await categoryForName(q.name) : null);
 
-  type Candidate = { estimate: number; low?: number; high?: number; confidence: Confidence; source: ScoutReport["source"]; summary: string };
+  type Candidate = { estimate: number; low?: number; high?: number; confidence: Confidence; source: ScoutReport["source"]; summary: string; scope: string };
   let pick: Candidate | null = null;
 
   // 1. Exact barcode, nearby
@@ -103,6 +103,7 @@ export async function runScout(q: ScoutQuery): Promise<ScoutReport> {
         estimate: s.estimate, low: s.low, high: s.high,
         confidence: s.n >= 3 ? "high" : "medium",
         source: { name: "Open Prices", detail: `${s.n} shopper-reported price${s.n > 1 ? "s" : ""} within 25 miles`, url: `https://prices.openfoodfacts.org/products/${product?.code || barcode}` },
+        scope: area || "local",
         summary: `${s.n} shopper${s.n > 1 ? "s" : ""} reported this exact item ${nearWords}${s.stores.length ? ` (${s.stores.join(", ")})` : ""}.`,
       };
     }
@@ -118,6 +119,7 @@ export async function runScout(q: ScoutQuery): Promise<ScoutReport> {
         estimate: s.estimate, low: s.low, high: s.high,
         confidence: s.n >= 3 ? "medium" : "low",
         source: { name: "Open Prices", detail: `${s.n} shopper-reported price${s.n > 1 ? "s" : ""} across the U.S.`, url: `https://prices.openfoodfacts.org/products/${product?.code || barcode}` },
+        scope: "U.S.",
         summary: `No local reports yet, so this is based on ${s.n} U.S. shopper report${s.n > 1 ? "s" : ""} for the same barcode.`,
       };
     }
@@ -132,6 +134,7 @@ export async function runScout(q: ScoutQuery): Promise<ScoutReport> {
       pick = {
         estimate: s.estimate, low: s.low, high: s.high, confidence: "low",
         source: { name: "Open Prices", detail: `${s.n} prices for similar ${pretty(category)} within 25 miles`, url: "https://prices.openfoodfacts.org" },
+        scope: area || "local",
         summary: `Based on ${s.n} shopper-reported prices for similar ${pretty(category)} ${nearWords}. Brand and size may differ.`,
       };
     }
@@ -140,13 +143,14 @@ export async function runScout(q: ScoutQuery): Promise<ScoutReport> {
 
   // 4. Government average for staples
   const blsText = [itemName, category ? pretty(category) : ""].join(" ");
-  if (!pick && matchBls(blsText)) {
+  if ((!pick || pick.confidence === "low") && matchBls(blsText)) {
     const b = await blsAverage(blsText, place?.state);
-    if (b) {
+    if (b && (!pick || pick.confidence === "low")) {
       const scaled = scaleBls(b.price, b.per, product, itemName);
       pick = {
         estimate: round2(scaled.value), confidence: "medium",
         source: { name: "U.S. Bureau of Labor Statistics", detail: `${b.label}, ${b.area} average, ${b.period} (${scaled.note})`, url: `https://data.bls.gov/timeseries/${b.series}` },
+        scope: b.area,
         summary: `The government's average for ${b.label.toLowerCase()} in ${b.area} was ${money(b.price)} ${b.per === "doz" ? "a dozen" : b.per === "gal" ? "a gallon" : "a pound"} in ${b.period}.`,
       };
     }
@@ -161,6 +165,7 @@ export async function runScout(q: ScoutQuery): Promise<ScoutReport> {
         pick = {
           estimate: round2(w.price), confidence: "medium",
           source: { name: w.store ? `${w.store} (web)` : "Web research", detail: w.note || "Found by searching local store listings", url: w.url },
+          scope: area || "local",
           summary: `Claude searched store listings ${nearWords} and found ${money(w.price)}${w.store ? ` at ${w.store}` : ""}.`,
         };
       }
@@ -178,6 +183,7 @@ export async function runScout(q: ScoutQuery): Promise<ScoutReport> {
       pick = {
         estimate: s.estimate, low: s.low, high: s.high, confidence: "low",
         source: { name: "Open Prices", detail: `${s.n} U.S. prices for similar ${pretty(category)}`, url: "https://prices.openfoodfacts.org" },
+        scope: "U.S.",
         summary: `Rough guide only: ${s.n} shopper-reported prices for similar ${pretty(category)} across the U.S.`,
       };
     }
@@ -198,10 +204,11 @@ export async function runScout(q: ScoutQuery): Promise<ScoutReport> {
     item: itemName,
     estimate: pick.estimate, low: pick.low, high: pick.high,
     confidence: pick.confidence, source: pick.source,
-    summary: `${label}: about ${money(pick.estimate)} ${nearWords}. ${pick.summary}${range}`,
+    scope: pick.scope,
+    summary: `${label}: typically about ${money(pick.estimate)} (${pick.scope === area && area ? `near ${area}` : `${pick.scope} data`}). ${pick.summary}${range}`,
   });
 
-  function finish(r: Pick<ScoutReport, "item" | "estimate" | "confidence" | "source" | "summary"> & { low?: number; high?: number }): ScoutReport {
+  function finish(r: Pick<ScoutReport, "item" | "estimate" | "confidence" | "source" | "summary"> & { low?: number; high?: number; scope?: string }): ScoutReport {
     return {
       ok: r.estimate !== null,
       brand: product?.brand,

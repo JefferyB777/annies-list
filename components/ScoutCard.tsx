@@ -90,7 +90,7 @@ export default function ScoutCard({ report, loading, zip, shelfPrice, applied, o
 
   return (
     <div className="scout">
-      <ScoutHead area={report.area} />
+      <ScoutHead area={report.area} scope={report.scope} />
       <div className="scout-main">
         <div>
           <div className="scout-price">{money(est)}</div>
@@ -147,7 +147,8 @@ export default function ScoutCard({ report, loading, zip, shelfPrice, applied, o
   );
 }
 
-function ScoutHead({ area }: { area: string | null }) {
+function ScoutHead({ area, scope }: { area: string | null; scope?: string }) {
+  const label = !area ? null : !scope || scope === area ? `near ${area}` : `${scope} data`;
   return (
     <div className="scout-head">
       <span className="scout-badge" aria-hidden>
@@ -157,7 +158,7 @@ function ScoutHead({ area }: { area: string | null }) {
         </svg>
       </span>
       <span className="mono scout-title">PRICE SCOUT</span>
-      {area && <span className="scout-area">near {area}</span>}
+      {label && <span className="scout-area">{label}</span>}
     </div>
   );
 }
